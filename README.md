@@ -1,30 +1,212 @@
 # EdTech Azure Data Factory Pipeline
 
-Welcome to the EdTech Azure Data Factory Pipeline project! This advanced system processes and analyzes educational data to provide insights into student performance, content effectiveness, and learning patterns using Azure Data Factory and related Azure services.
+Welcome to the EdTech Azure Data Factory Pipeline project! This advanced system processes and analyzes educational data from multiple sources to provide comprehensive insights into student performance, content effectiveness, and learning patterns using Azure Data Factory and related Azure services.
 
 ## Table of Contents
 - [Project Overview](#project-overview)
+- [Data Sources](#data-sources)
 - [Azure Architecture](#azure-architecture)
 - [Project Structure](#project-structure)
 - [Setup and Configuration](#setup-and-configuration)
 - [Usage](#usage)
 - [Example: Student Performance Analysis](#example-student-performance-analysis)
 - [Example: Content Effectiveness Evaluation](#example-content-effectiveness-evaluation)
+- [Example: Educational Research Integration](#example-educational-research-integration)
 - [CI/CD with Azure DevOps](#cicd-with-azure-devops)
 - [License](#license)
 
 ## Project Overview
 
-Our EdTech Azure Data Factory Pipeline is designed to handle large-scale data processing for educational platforms. It includes data ingestion from various sources, processing, analysis, and visualization components to enhance learning experiences and provide valuable insights for educators and administrators.
+Our EdTech Azure Data Factory Pipeline is designed to handle large-scale educational data processing from various sources. It includes data ingestion from internal systems and external educational datasets, processing, analysis, and visualization components to enhance learning experiences and provide valuable insights for educators and administrators.
 
 Key features:
 - Integration with Learning Management Systems (LMS) and Student Information Systems (SIS)
+- Integration with high-quality educational research databases and public datasets
 - Real-time student activity tracking and processing
 - Scalable data processing using Azure Data Factory and Azure Databricks
 - Machine learning models for personalized learning path recommendations
 - Student performance analytics and early intervention systems
 - Content effectiveness analysis and improvement suggestions
 - Integration with Azure Cognitive Services for natural language processing of student feedback
+
+## Data Sources
+
+### Internal Data Sources
+1. **Learning Management Systems**
+   - Canvas LMS API
+   - Moodle Web Services
+   - Blackboard Learn REST API
+
+2. **Student Information Systems**
+   - PowerSchool API
+   - Ellucian Banner API
+
+### External Data Sources
+1. **Educational Statistics**
+   - **National Center for Education Statistics (NCES)**: Comprehensive education data
+     - API: [NCES RestAPI](https://nces.ed.gov/developer)
+     - Datasets: Enrollment, achievement, demographics
+     - Use for: Benchmarking and contextual analysis
+
+2. **Academic Research**
+   - **Education Resources Information Center (ERIC)**
+     - API Documentation: [ERIC API](https://eric.ed.gov/?api)
+     - Content: Research papers, teaching methodologies
+     - Use for: Evidence-based teaching strategies
+
+3. **Open Educational Resources**
+   - **OER Commons API**: Access to open educational resources
+     - API Documentation: [OER Commons API](https://www.oercommons.org/api-docs)
+     - Use for: Supplementary content recommendations
+
+4. **Cognitive Skills Research**
+   - **NIH Cognitive Atlas**: Standardized cognitive concepts
+     - API: [Cognitive Atlas API](https://www.cognitiveatlas.org/api/)
+     - Use for: Aligning content with cognitive development stages
+
+5. **Labor Market Data**
+   - **O*NET Web Services**: Occupational information network
+     - API Documentation: [O*NET API](https://services.onetcenter.org/reference)
+     - Use for: Career pathway alignment and guidance
+
+### Data Integration Examples
+
+```python
+# Example: Integrating NCES data for contextual analysis
+from nces_api import NCESClient
+import pandas as pd
+
+def enrich_student_data_with_nces():
+    nces_client = NCESClient(api_key=os.environ["NCES_API_KEY"])
+    
+    # Fetch national achievement data
+    national_data = nces_client.get_achievement_data(
+        subject="mathematics",
+        grade_level="8th",
+        year="2024"
+    )
+    
+    # Convert to Spark DataFrame
+    national_df = spark.createDataFrame(pd.DataFrame(national_data))
+    
+    # Read local student performance data
+    local_df = spark.read.parquet("abfss://processed-data@yourdatalake.dfs.core.windows.net/student_performance/")
+    
+    # Perform comparative analysis
+    comparison = local_df.join(
+        national_df,
+        ["subject", "grade_level"]
+    ).select(
+        "subject",
+        local_df.avg_score.alias("local_avg"),
+        national_df.avg_score.alias("national_avg")
+    )
+    
+    return comparison
+
+# Example: Integrating ERIC research for content enhancement
+def enhance_content_with_research():
+    eric_client = ERICClient(api_key=os.environ["ERIC_API_KEY"])
+    
+    # Fetch relevant research papers
+    research_data = eric_client.search(
+        keywords=["active learning", "student engagement"],
+        publication_date_gte="2023-01-01"
+    )
+    
+    # Extract teaching methodologies
+    methodologies = extract_methodologies(research_data)
+    
+    # Enhance content recommendations
+    enhanced_recommendations = spark.read.parquet("abfss://processed-data@yourdatalake.dfs.core.windows.net/content_recommendations/") \
+        .join(
+            spark.createDataFrame(methodologies),
+            "subject"
+        )
+    
+    return enhanced_recommendations
+
+def extract_methodologies(research_data):
+    # Use Azure Cognitive Services to extract teaching methodologies
+    text_analytics_client = TextAnalyticsClient(
+        endpoint=os.environ["COGNITIVE_SERVICES_ENDPOINT"],
+        credential=os.environ["COGNITIVE_SERVICES_KEY"]
+    )
+    
+    methodologies = []
+    for paper in research_data:
+        key_phrases = text_analytics_client.extract_key_phrases([paper.abstract])[0]
+        methodologies.extend(key_phrases)
+    
+    return methodologies
+```
+
+[Rest of the original sections remain unchanged: Azure Architecture, Project Structure, Setup and Configuration, Usage, original examples, and CI/CD with Azure DevOps]
+
+## Example: Educational Research Integration
+
+Here's an example of how to integrate educational research data to enhance content recommendations:
+
+```python
+# In Azure Databricks notebook
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, explode
+from azure.ai.textanalytics import TextAnalyticsClient
+from azure.core.credentials import AzureKeyCredential
+
+def integrate_research_insights():
+    # Initialize clients
+    spark = SparkSession.builder.appName("ResearchIntegration").getOrCreate()
+    text_analytics_client = TextAnalyticsClient(
+        endpoint=os.environ["COGNITIVE_SERVICES_ENDPOINT"],
+        credential=AzureKeyCredential(os.environ["COGNITIVE_SERVICES_KEY"])
+    )
+    eric_client = ERICClient(api_key=os.environ["ERIC_API_KEY"])
+
+    # Read current content data
+    content_df = spark.read.parquet("abfss://processed-data@yourdatalake.dfs.core.windows.net/course_content/")
+
+    # For each subject area, fetch and analyze relevant research
+    for subject in content_df.select("subject").distinct().collect():
+        # Fetch related research papers
+        papers = eric_client.search(
+            keywords=[subject.subject],
+            publication_date_gte="2023-01-01"
+        )
+        
+        # Extract key insights using Azure Cognitive Services
+        research_insights = []
+        for paper in papers:
+            response = text_analytics_client.extract_key_phrases([paper.abstract])[0]
+            research_insights.extend(response.key_phrases)
+        
+        # Create DataFrame with research insights
+        research_df = spark.createDataFrame(
+            [(subject.subject, insight) for insight in research_insights],
+            ["subject", "research_insight"]
+        )
+        
+        # Join with content data and save enriched content
+        enriched_content = content_df \
+            .join(research_df, "subject") \
+            .groupBy("content_id", "subject", "title") \
+            .agg(collect_list("research_insight").alias("research_insights"))
+        
+        # Save enriched content
+        enriched_content.write \
+            .mode("overwrite") \
+            .parquet(f"abfss://processed-data@yourdatalake.dfs.core.windows.net/enriched_content/{subject.subject}")
+
+# Execute the integration
+integrate_research_insights()
+```
+
+This example demonstrates how to:
+1. Fetch relevant research papers from ERIC based on subject areas
+2. Extract key insights using Azure Cognitive Services
+3. Enrich existing course content with research-backed insights
+4. Save the enriched content for use in recommendations and content development
 
 ## Azure Architecture
 
